@@ -2,7 +2,7 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import { middleware, SECRET_KEY } from "../middleware/middleware";
 import jwt from "jsonwebtoken";
-import { signupSchema, type AuthenticatedRequest } from '../src/types';
+import { onrampSchema, signupSchema, type AuthenticatedRequest } from '../src/types';
 
 const route = express.Router();
 
@@ -14,8 +14,20 @@ const balance: Map<number, number> = new Map();
 const stockBalance: Map<number, Map<number, number>> = new Map();
 
 route.post("/onramp", (req: Request, res: Response) => {
+    const user = (req as unknown as AuthenticatedRequest).user
+    const parsedData = onrampSchema.safeParse(req.body);
+    if(!parsedData.success){
+        return res.status(404).json({
+            message : "Validation failed"
+        })
+    }
+
     try {
-        
+        const blc = balance.get(user.id);
+        balance.set(user.id,(blc!+ parsedData.data.qty));
+        return res.status(200).json({
+            message:"Balance updated successfylly"
+        })
     } catch (error) {
 
     }

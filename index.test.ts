@@ -39,5 +39,3 @@ test("check balance is working fine",async() => {
     expect(balanceResponse.data.usdBalance).toBe(0)
 
 })
-
-test("")
