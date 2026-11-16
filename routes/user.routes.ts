@@ -2,7 +2,7 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import { middleware, SECRET_KEY } from "../middleware/middleware";
 import jwt from "jsonwebtoken";
-import { onrampSchema, signupSchema, type AuthenticatedRequest } from '../src/types';
+import { onrampSchema, OrderRequestSchema, signupSchema, type AuthenticatedRequest } from '../src/types';
 
 const route = express.Router();
 
@@ -10,8 +10,8 @@ let USER_INDEX = 0;
 
 const USERS: { id: number; username: string; password: string }[] = [];
 
-const balance: Map<number, number> = new Map();
-const stockBalance: Map<number, Map<number, number>> = new Map();
+const balance: Map<number, {available: number, locked: number}> = new Map();
+const stockBalance: Map<number, Map<number, {available: number, locked: number}>> = new Map();
 
 route.post("/onramp", (req: Request, res: Response) => {
     const user = (req as unknown as AuthenticatedRequest).user
@@ -23,8 +23,8 @@ route.post("/onramp", (req: Request, res: Response) => {
     }
 
     try {
-        const blc = balance.get(user.id);
-        balance.set(user.id,(blc!+ parsedData.data.qty));
+        const blc = balance.get(user.id)?.available;
+        balance.set(user.id,{available: blc! + parsedData.data.qty, locked: balance.get(user.id)?.locked!});
         return res.status(200).json({
             message:"Balance updated successfylly"
         })
@@ -45,8 +45,8 @@ route.get("/balance", middleware, (req: Request, res: Response) => {
     console.log("hello2", user)
 
     res.status(200).json({
-        usdBalance: balance.get(user.id) ?? 0,
-        stockBalance: Object.fromEntries(userStocks)
+        usdBalance: balance.get(user.id)?.available ?? 0,
+        // stockBalance: Object.fromEntries(userStocks)
     })
 })
 
@@ -107,5 +107,25 @@ route.post("/signin", (req: Request, res: Response) => {
 route.get("/", (req: Request, res: Response) => {
     res.status(200).json({ message: "Hello there" });
 });
+
+route.post("/order",middleware, (req: Request, res: Response) => {
+    const user = (req as unknown as AuthenticatedRequest).user
+    const parsedData = OrderRequestSchema.safeParse(req.body);
+    if(!parsedData.success){
+        return res.status(404).json({message:"Validation failed"})
+    }
+    const body = parsedData.data;
+    if(body.side == "bid"){
+        const amountTospend = body.price * body.qty;
+        const userBalance = balance.get(user.id)?.available;
+        if(userBalance! < amountTospend){
+            return res.status(411).json({
+                message: "Insufficient balance"
+            })
+        }
+        
+
+    }
+})
 
 export { route };

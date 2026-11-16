@@ -20,3 +20,11 @@ export const signinSchema = z.object({
 export const onrampSchema = z.object({
     qty: z.number()
 })
+
+export const OrderRequestSchema = z.object({
+    type: z.string(),
+    side: z.string(),
+    qty: z.number(),
+    price: z.number(),
+    asset : z.string()
+})
