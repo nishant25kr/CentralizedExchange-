@@ -3,15 +3,16 @@ import type { Request, Response } from 'express';
 import { middleware, SECRET_KEY } from "../middleware/middleware";
 import jwt from "jsonwebtoken";
 import { onrampSchema, OrderRequestSchema, signupSchema, type AuthenticatedRequest } from '../src/types';
+import { OrderBook } from '../src/orderbook';
 
 const route = express.Router();
 
 let USER_INDEX = 0;
 
-const USERS: { id: number; username: string; password: string }[] = [];
-
-const balance: Map<number, {available: number, locked: number}> = new Map();
-const stockBalance: Map<number, Map<number, {available: number, locked: number}>> = new Map();
+const USERS: { id: string; username: string; password: string }[] = [];
+const SOL_ORDERBOOK = new OrderBook('sol')
+const balance: Map<string, {available: number, locked: number}> = new Map();
+const stockBalance: Map<string, Map<string, {available: number, locked: number}>> = new Map();
 
 route.post("/onramp", (req: Request, res: Response) => {
     const user = (req as unknown as AuthenticatedRequest).user
@@ -124,6 +125,32 @@ route.post("/order",middleware, (req: Request, res: Response) => {
             })
         }
         
+        if(body.asset == 'sol'){
+            let fills = SOL_ORDERBOOK.addOrder(user.id.toString(),'bids',body.price,body.qty);
+            fills.forEach( fill => {
+                if(fill.type == 'fill'){
+                    stockBalance.get(fill.buyer)!.set("sol",{
+                        available: stockBalance.get(fill.buyer)!.get("sol")!.available + fill.qty,
+                        locked: stockBalance.get(fill.buyer)!.get("sol")!.locked
+                    })
+                    stockBalance.get(fill.seller)!.set("sol",{
+                        available: stockBalance.get(fill.seller)!.get("sol")!.available + fill.qty,
+                        locked: stockBalance.get(fill.seller)!.get("sol")!.locked -= fill.qty
+                    })
+                    balance.set(user.id,{
+                        available: balance.get(user.id)?.available! - fill.price * fill.qty,
+                        locked: balance.get(user.id)?.locked!
+                    })
+                    balance.set(fill.seller,{
+                        available: balance.get(fill.seller)?.available! + fill.price * fill.qty,
+                        locked: balance.get(fill.seller)?.locked!
+                    })
+                }
+                if(fill.type == 'orderbook_update'){
+                    
+                }
+            })
+        }
 
     }
 })

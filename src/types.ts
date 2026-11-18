@@ -7,7 +7,7 @@ export const signupSchema = z.object({
 
 export type AuthenticatedRequest = Request & {
     user: {
-        id: number;
+        id: string;
         username: string;
     };
 };
